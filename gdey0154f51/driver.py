@@ -32,6 +32,7 @@ class GDEY0154F51Controller:
         gpio: GpioBus,
         pins: PinConfig | None = None,
         manual_cs: bool = False,
+        initial_busy_timeout_s: float = 0.25,
         busy_timeout_s: float = 20.0,
         busy_poll_interval_s: float = 0.01,
         sleep_fn=time.sleep,
@@ -40,6 +41,7 @@ class GDEY0154F51Controller:
         self.gpio = gpio
         self.pins = pins or PinConfig()
         self.manual_cs = manual_cs
+        self.initial_busy_timeout_s = initial_busy_timeout_s
         self.busy_timeout_s = busy_timeout_s
         self.busy_poll_interval_s = busy_poll_interval_s
         self.sleep_fn = sleep_fn
@@ -101,9 +103,17 @@ class GDEY0154F51Controller:
         self.gpio.write(self.pins.rst, 1)
         self.sleep_fn(0.05)
 
+    def wait_until_idle_after_reset(self) -> None:
+        # Some boards keep BUSY asserted until the first init/power-on command
+        # after deep sleep. Treat this pre-init wait as a best-effort probe.
+        self.wait_until_idle(timeout_s=self.initial_busy_timeout_s)
+
     def init_full_update(self) -> None:
         self.hardware_reset()
-        self.wait_until_idle()
+        try:
+            self.wait_until_idle_after_reset()
+        except TimeoutError:
+            pass
 
         self.write_command(0x4D)
         self.write_data_byte(0x78)

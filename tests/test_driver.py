@@ -71,6 +71,23 @@ class DriverTests(unittest.TestCase):
     def test_hardware_cs_mode_does_not_allocate_cs_gpio(self) -> None:
         self.assertNotIn(self.pins.cs, self.gpio.pin_mode)
 
+    def test_init_continues_when_busy_stays_low_after_reset(self) -> None:
+        reads = {"count": 0}
+
+        def dynamic_read(pin: int) -> int:
+            if pin != self.pins.busy:
+                return self.gpio.pin_values.get(pin, 1)
+            reads["count"] += 1
+            if reads["count"] < 300:
+                return 0
+            return 1
+
+        self.gpio.read = dynamic_read  # type: ignore[method-assign]
+        self.controller.init_full_update()
+
+        commands = [item.value for item in self.controller.trace if item.kind == "cmd"]
+        self.assertIn(0x04, commands)
+
 
 if __name__ == "__main__":
     unittest.main()
