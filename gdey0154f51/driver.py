@@ -31,6 +31,7 @@ class GDEY0154F51Controller:
         spi: SpiBus,
         gpio: GpioBus,
         pins: PinConfig | None = None,
+        manual_cs: bool = False,
         busy_timeout_s: float = 20.0,
         busy_poll_interval_s: float = 0.01,
         sleep_fn=time.sleep,
@@ -38,6 +39,7 @@ class GDEY0154F51Controller:
         self.spi = spi
         self.gpio = gpio
         self.pins = pins or PinConfig()
+        self.manual_cs = manual_cs
         self.busy_timeout_s = busy_timeout_s
         self.busy_poll_interval_s = busy_poll_interval_s
         self.sleep_fn = sleep_fn
@@ -50,22 +52,31 @@ class GDEY0154F51Controller:
         self.gpio.setup_input(self.pins.busy)
         self.gpio.setup_output(self.pins.rst)
         self.gpio.setup_output(self.pins.dc)
-        self.gpio.setup_output(self.pins.cs)
-        self.gpio.write(self.pins.cs, 1)
+        if self.manual_cs:
+            self.gpio.setup_output(self.pins.cs)
+            self.gpio.write(self.pins.cs, 1)
         self.gpio.write(self.pins.rst, 1)
 
+    def _select_chip(self) -> None:
+        if self.manual_cs:
+            self.gpio.write(self.pins.cs, 0)
+
+    def _deselect_chip(self) -> None:
+        if self.manual_cs:
+            self.gpio.write(self.pins.cs, 1)
+
     def write_command(self, command: int) -> None:
-        self.gpio.write(self.pins.cs, 0)
+        self._select_chip()
         self.gpio.write(self.pins.dc, 0)
         self.spi.write(bytes([command & 0xFF]))
-        self.gpio.write(self.pins.cs, 1)
+        self._deselect_chip()
         self.trace.append(DriverTrace("cmd", command & 0xFF))
 
     def write_data_byte(self, value: int) -> None:
-        self.gpio.write(self.pins.cs, 0)
+        self._select_chip()
         self.gpio.write(self.pins.dc, 1)
         self.spi.write(bytes([value & 0xFF]))
-        self.gpio.write(self.pins.cs, 1)
+        self._deselect_chip()
         self.trace.append(DriverTrace("data", value & 0xFF))
 
     def write_data(self, data: bytes) -> None:
@@ -178,11 +189,13 @@ class GDEY0154F51:
         spi_config: SpiConfig | None = None,
         busy_timeout_s: float = 20.0,
     ) -> "GDEY0154F51":
-        hal = create_rpi_hal(pin_config=pin_config, spi_config=spi_config)
+        effective_spi_config = spi_config or SpiConfig()
+        hal = create_rpi_hal(pin_config=pin_config, spi_config=effective_spi_config)
         controller = GDEY0154F51Controller(
             spi=hal.spi,
             gpio=hal.gpio,
             pins=pin_config or PinConfig(),
+            manual_cs=not effective_spi_config.use_hardware_cs,
             busy_timeout_s=busy_timeout_s,
         )
         return cls(controller=controller)

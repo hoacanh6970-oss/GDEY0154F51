@@ -15,6 +15,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repeat", type=int, default=1, help="number of loop rounds")
 
     parser.add_argument("--spi-speed", type=int, default=2_000_000)
+    parser.add_argument(
+        "--manual-cs",
+        action="store_true",
+        help="Use GPIO-managed CS instead of spidev hardware chip select",
+    )
     parser.add_argument("--pin-rst", type=int, default=17)
     parser.add_argument("--pin-dc", type=int, default=25)
     parser.add_argument("--pin-cs", type=int, default=8)
@@ -27,7 +32,10 @@ def main() -> None:
     pins = PinConfig(
         rst=args.pin_rst, dc=args.pin_dc, cs=args.pin_cs, busy=args.pin_busy
     )
-    spi = SpiConfig(max_speed_hz=args.spi_speed)
+    spi = SpiConfig(
+        max_speed_hz=args.spi_speed,
+        use_hardware_cs=not args.manual_cs,
+    )
 
     colors = [Color.BLACK, Color.WHITE, Color.YELLOW, Color.RED]
 

@@ -23,6 +23,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spi-bus", type=int, default=0)
     parser.add_argument("--spi-device", type=int, default=0)
     parser.add_argument("--spi-speed", type=int, default=2_000_000)
+    parser.add_argument(
+        "--manual-cs",
+        action="store_true",
+        help="Use GPIO-managed CS instead of spidev hardware chip select",
+    )
 
     parser.add_argument("--pin-rst", type=int, default=17)
     parser.add_argument("--pin-dc", type=int, default=25)
@@ -39,7 +44,11 @@ def main() -> None:
         rst=args.pin_rst, dc=args.pin_dc, cs=args.pin_cs, busy=args.pin_busy
     )
     spi = SpiConfig(
-        bus=args.spi_bus, device=args.spi_device, max_speed_hz=args.spi_speed, mode=0
+        bus=args.spi_bus,
+        device=args.spi_device,
+        max_speed_hz=args.spi_speed,
+        mode=0,
+        use_hardware_cs=not args.manual_cs,
     )
 
     epd = GDEY0154F51.from_rpi(pin_config=pins, spi_config=spi)

@@ -30,6 +30,7 @@ class SpiConfig:
     device: int = 0
     max_speed_hz: int = 2_000_000
     mode: int = 0
+    use_hardware_cs: bool = True
 
 
 FILL_BYTE_BY_COLOR: dict[Color, int] = {

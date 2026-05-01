@@ -68,6 +68,9 @@ class DriverTests(unittest.TestCase):
 
         self.assertEqual(self.controller.last_ram[0], 0x6C)
 
+    def test_hardware_cs_mode_does_not_allocate_cs_gpio(self) -> None:
+        self.assertNotIn(self.pins.cs, self.gpio.pin_mode)
+
 
 if __name__ == "__main__":
     unittest.main()
