@@ -1,3 +1,6 @@
-spidev>=3.5
-RPi.GPIO>=0.7.1
 Pillow>=9.0.0
+fastapi>=0.110.0
+uvicorn>=0.27.0
+httpx>=0.27.0
+spidev>=3.5; platform_system == "Linux"
+RPi.GPIO>=0.7.1; platform_system == "Linux"
