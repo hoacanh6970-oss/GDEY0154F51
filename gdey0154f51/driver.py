@@ -32,6 +32,8 @@ class GDEY0154F51Controller:
         gpio: GpioBus,
         pins: PinConfig | None = None,
         manual_cs: bool = False,
+        busy_ready_level: int = 1,
+        busy_auto_fallback: bool = False,
         initial_busy_timeout_s: float = 0.25,
         busy_timeout_s: float = 20.0,
         busy_poll_interval_s: float = 0.01,
@@ -41,6 +43,9 @@ class GDEY0154F51Controller:
         self.gpio = gpio
         self.pins = pins or PinConfig()
         self.manual_cs = manual_cs
+        self.busy_ready_level = 1 if busy_ready_level else 0
+        self.busy_auto_fallback = busy_auto_fallback
+        self._busy_fallback_used = False
         self.initial_busy_timeout_s = initial_busy_timeout_s
         self.busy_timeout_s = busy_timeout_s
         self.busy_poll_interval_s = busy_poll_interval_s
@@ -85,16 +90,30 @@ class GDEY0154F51Controller:
         for value in data:
             self.write_data_byte(value)
 
-    def wait_until_idle(self, timeout_s: float | None = None) -> None:
-        timeout = self.busy_timeout_s if timeout_s is None else timeout_s
-        deadline = time.monotonic() + timeout
+    def _wait_until_busy_level(self, ready_level: int, timeout_s: float) -> None:
+        deadline = time.monotonic() + timeout_s
 
-        while self.gpio.read(self.pins.busy) != 1:
+        while self.gpio.read(self.pins.busy) != ready_level:
             if time.monotonic() > deadline:
                 raise TimeoutError(
-                    f"BUSY pin did not become ready within {timeout:.2f}s"
+                    f"BUSY pin did not become ready within {timeout_s:.2f}s"
                 )
             self.sleep_fn(self.busy_poll_interval_s)
+
+    def wait_until_idle(self, timeout_s: float | None = None) -> None:
+        timeout = self.busy_timeout_s if timeout_s is None else timeout_s
+        try:
+            self._wait_until_busy_level(self.busy_ready_level, timeout)
+            return
+        except TimeoutError:
+            # Some board revisions expose inverse BUSY polarity.
+            if not self.busy_auto_fallback or self._busy_fallback_used:
+                raise
+
+        opposite_level = 1 - self.busy_ready_level
+        self._wait_until_busy_level(opposite_level, timeout)
+        self.busy_ready_level = opposite_level
+        self._busy_fallback_used = True
 
     def hardware_reset(self) -> None:
         self.sleep_fn(0.02)
@@ -190,6 +209,8 @@ class GDEY0154F51:
         cls,
         pin_config: PinConfig | None = None,
         spi_config: SpiConfig | None = None,
+        busy_ready_level: int = 1,
+        busy_auto_fallback: bool = True,
         busy_timeout_s: float = 20.0,
     ) -> "GDEY0154F51":
         effective_spi_config = spi_config or SpiConfig()
@@ -199,6 +220,8 @@ class GDEY0154F51:
             gpio=hal.gpio,
             pins=pin_config or PinConfig(),
             manual_cs=not effective_spi_config.use_hardware_cs,
+            busy_ready_level=busy_ready_level,
+            busy_auto_fallback=busy_auto_fallback,
             busy_timeout_s=busy_timeout_s,
         )
         return cls(controller=controller)

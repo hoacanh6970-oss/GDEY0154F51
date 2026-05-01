@@ -64,6 +64,14 @@ sudo python tools/display_image.py --image assets/test.jpg
 sudo python tools/test_colors.py --interval 2 --repeat 1
 ```
 
+若出现 `BUSY pin did not become ready`，可尝试：
+
+```bash
+sudo python tools/test_colors.py --busy-active-low
+# 或显示图片时：
+sudo python tools/display_image.py --image assets/test.jpg --busy-active-low
+```
+
 ## 默认引脚
 
 默认使用 BCM 编号：

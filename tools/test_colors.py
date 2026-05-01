@@ -24,6 +24,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pin-dc", type=int, default=25)
     parser.add_argument("--pin-cs", type=int, default=8)
     parser.add_argument("--pin-busy", type=int, default=24)
+    parser.add_argument(
+        "--busy-active-low",
+        action="store_true",
+        help="Treat BUSY=0 as ready (some board revisions use inverted polarity)",
+    )
+    parser.add_argument(
+        "--no-busy-auto-fallback",
+        action="store_true",
+        help="Disable automatic BUSY polarity fallback after timeout",
+    )
     return parser.parse_args()
 
 
@@ -39,7 +49,12 @@ def main() -> None:
 
     colors = [Color.BLACK, Color.WHITE, Color.YELLOW, Color.RED]
 
-    epd = GDEY0154F51.from_rpi(pin_config=pins, spi_config=spi)
+    epd = GDEY0154F51.from_rpi(
+        pin_config=pins,
+        spi_config=spi,
+        busy_ready_level=0 if args.busy_active_low else 1,
+        busy_auto_fallback=not args.no_busy_auto_fallback,
+    )
     try:
         for _ in range(args.repeat):
             for color in colors:
