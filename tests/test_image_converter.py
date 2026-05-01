@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from gdey0154f51.constants import BUFFER_SIZE
+from gdey0154f51.constants import BUFFER_SIZE, HEIGHT, WIDTH
 from gdey0154f51.image_converter import ConvertOptions, ImageConverter
 
 try:
@@ -17,7 +17,7 @@ class ImageConverterTests(unittest.TestCase):
         self.converter = ImageConverter()
 
     def test_convert_solid_red_image(self) -> None:
-        img = Image.new("RGB", (152, 152), (255, 0, 0))
+        img = Image.new("RGB", (WIDTH, HEIGHT), (255, 0, 0))
         try:
             buffer = self.converter.convert_image(
                 img, options=ConvertOptions(dither=False)

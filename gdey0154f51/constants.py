@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 
-WIDTH = 152
-HEIGHT = 152
+WIDTH = 200
+HEIGHT = 200
 PIXELS_PER_BYTE = 4
 BUFFER_SIZE = WIDTH * HEIGHT // PIXELS_PER_BYTE
 

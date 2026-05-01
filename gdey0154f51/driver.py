@@ -121,35 +121,14 @@ class GDEY0154F51Controller:
         self.write_command(0x00)
         self.write_data(bytes([0x0F, 0x29]))
 
-        self.write_command(0x01)
-        self.write_data(bytes([0x07, 0x00]))
-
-        self.write_command(0x03)
-        self.write_data(bytes([0x10, 0x54, 0x44]))
-
         self.write_command(0x06)
-        self.write_data(bytes([0x05, 0x00, 0x3F, 0x0A, 0x25, 0x12, 0x1A]))
+        self.write_data(bytes([0x0D, 0x12, 0x30, 0x20, 0x19, 0x2A, 0x22]))
 
         self.write_command(0x50)
         self.write_data_byte(0x37)
 
-        self.write_command(0x60)
-        self.write_data(bytes([0x02, 0x02]))
-
         self.write_command(0x61)
-        self.write_data(bytes([0x00, 0x98, 0x00, 0x98]))
-
-        self.write_command(0xE7)
-        self.write_data_byte(0x1C)
-
-        self.write_command(0xE3)
-        self.write_data_byte(0x22)
-
-        self.write_command(0xB4)
-        self.write_data_byte(0xD0)
-
-        self.write_command(0xB5)
-        self.write_data_byte(0x03)
+        self.write_data(bytes([0x00, 0xC8, 0x00, 0xC8]))
 
         self.write_command(0xE9)
         self.write_data_byte(0x01)
@@ -158,6 +137,19 @@ class GDEY0154F51Controller:
         self.write_data_byte(0x08)
 
         self.write_command(0x04)
+        self.wait_until_idle()
+
+    def init_fast_update(self) -> None:
+        self.init_full_update()
+
+        self.write_command(0xE0)
+        self.write_data_byte(0x02)
+
+        self.write_command(0xE6)
+        self.write_data_byte(0x5D)
+
+        self.write_command(0xA5)
+        self.write_data_byte(0x00)
         self.wait_until_idle()
 
     def write_ram(self, buffer: bytes) -> None:
@@ -174,6 +166,7 @@ class GDEY0154F51Controller:
 
     def sleep(self) -> None:
         self.write_command(0x02)
+        self.write_data_byte(0x00)
         self.wait_until_idle()
         self.sleep_fn(0.1)
 
@@ -210,14 +203,21 @@ class GDEY0154F51:
         )
         return cls(controller=controller)
 
-    def display_native_buffer(self, buffer: bytes, auto_sleep: bool = True) -> None:
-        self.controller.init_full_update()
+    def display_native_buffer(
+        self, buffer: bytes, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
+        if fast_update:
+            self.controller.init_fast_update()
+        else:
+            self.controller.init_full_update()
         self.controller.write_ram(buffer)
         self.controller.refresh()
         if auto_sleep:
             self.controller.sleep()
 
-    def display_demo_buffer(self, demo_buffer: bytes, auto_sleep: bool = True) -> None:
+    def display_demo_buffer(
+        self, demo_buffer: bytes, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
         if len(demo_buffer) != BUFFER_SIZE:
             raise ValueError(f"buffer size must be {BUFFER_SIZE} bytes")
 
@@ -229,7 +229,9 @@ class GDEY0154F51:
             p3 = DEMO_TO_NATIVE_2BIT[value & 0x03]
             native[i] = (p0 << 6) | (p1 << 4) | (p2 << 2) | p3
 
-        self.display_native_buffer(bytes(native), auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            bytes(native), auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
     def display_image(
         self,
@@ -238,18 +240,25 @@ class GDEY0154F51:
         fit: str = "contain",
         rotate: int = 0,
         auto_sleep: bool = True,
+        fast_update: bool = False,
     ) -> None:
         options = ConvertOptions(dither=dither, fit=fit, rotate=rotate)
         buffer = self.converter.convert_file(image_path, options=options)
-        self.display_native_buffer(buffer, auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            buffer, auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
-    def fill(self, color: Color, auto_sleep: bool = True) -> None:
+    def fill(
+        self, color: Color, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
         fill_byte = FILL_BYTE_BY_COLOR[color]
         buffer = bytes([fill_byte]) * BUFFER_SIZE
-        self.display_native_buffer(buffer, auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            buffer, auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
-    def clear(self, auto_sleep: bool = True) -> None:
-        self.fill(Color.WHITE, auto_sleep=auto_sleep)
+    def clear(self, auto_sleep: bool = True, fast_update: bool = False) -> None:
+        self.fill(Color.WHITE, auto_sleep=auto_sleep, fast_update=fast_update)
 
     def close(self) -> None:
         try:

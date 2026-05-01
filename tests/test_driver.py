@@ -32,21 +32,21 @@ class DriverTests(unittest.TestCase):
             [
                 0x4D,
                 0x00,
-                0x01,
-                0x03,
                 0x06,
                 0x50,
-                0x60,
                 0x61,
-                0xE7,
-                0xE3,
-                0xB4,
-                0xB5,
                 0xE9,
                 0x30,
                 0x04,
             ],
         )
+
+    def test_fast_init_sequence_appends_fast_commands(self) -> None:
+        self.gpio.set_input_value(self.pins.busy, 1)
+        self.controller.init_fast_update()
+
+        commands = [item.value for item in self.controller.trace if item.kind == "cmd"]
+        self.assertEqual(commands[-3:], [0xE0, 0xE6, 0xA5])
 
     def test_wait_busy_timeout(self) -> None:
         self.gpio.set_input_value(self.pins.busy, 0)

@@ -19,6 +19,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-sleep", action="store_true", help="Do not enter deep sleep after refresh"
     )
+    parser.add_argument(
+        "--fast-update",
+        action="store_true",
+        help="Use Arduino fast full-update initialization sequence",
+    )
 
     parser.add_argument("--spi-bus", type=int, default=0)
     parser.add_argument("--spi-device", type=int, default=0)
@@ -59,6 +64,7 @@ def main() -> None:
             fit=args.fit,
             rotate=args.rotate,
             auto_sleep=not args.no_sleep,
+            fast_update=args.fast_update,
         )
         print("display refresh complete")
     finally:

@@ -1,6 +1,6 @@
 # GDEY0154F51 Raspberry Pi Driver
 
-基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（152x152, 4-color, 2bpp）。
+基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（200x200, 4-color, 2bpp）。
 
 ## 特性
 
