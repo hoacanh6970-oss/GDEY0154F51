@@ -1,6 +1,6 @@
 # GDEY0154F51 Raspberry Pi Driver
 
-基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（152x152, 4-color, 2bpp）。
+基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（200x200, 4-color, 2bpp）。
 
 ## 特性
 
@@ -62,6 +62,14 @@ sudo python tools/display_image.py --image assets/test.jpg
 
 ```bash
 sudo python tools/test_colors.py --interval 2 --repeat 1
+```
+
+若出现 `BUSY pin did not become ready`，可尝试：
+
+```bash
+sudo python tools/test_colors.py --busy-active-low
+# 或显示图片时：
+sudo python tools/display_image.py --image assets/test.jpg --busy-active-low
 ```
 
 ## 默认引脚

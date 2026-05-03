@@ -43,6 +43,8 @@ class PiServerConfig:
             device=_get_int("SPI_DEVICE", 0),
             max_speed_hz=_get_int("SPI_SPEED", 2_000_000),
             mode=_get_int("SPI_MODE", 0),
+            use_hardware_cs=os.getenv("SPI_MANUAL_CS", "0")
+            not in {"1", "true", "TRUE", "yes", "YES"},
         )
         return cls(
             api_key=os.getenv("API_KEY", "dev-api-key"),

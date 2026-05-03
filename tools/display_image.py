@@ -19,15 +19,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-sleep", action="store_true", help="Do not enter deep sleep after refresh"
     )
+    parser.add_argument(
+        "--fast-update",
+        action="store_true",
+        help="Use Arduino fast full-update initialization sequence",
+    )
 
     parser.add_argument("--spi-bus", type=int, default=0)
     parser.add_argument("--spi-device", type=int, default=0)
     parser.add_argument("--spi-speed", type=int, default=2_000_000)
+    parser.add_argument(
+        "--manual-cs",
+        action="store_true",
+        help="Use GPIO-managed CS instead of spidev hardware chip select",
+    )
 
     parser.add_argument("--pin-rst", type=int, default=17)
     parser.add_argument("--pin-dc", type=int, default=25)
     parser.add_argument("--pin-cs", type=int, default=8)
     parser.add_argument("--pin-busy", type=int, default=24)
+    parser.add_argument(
+        "--busy-active-low",
+        action="store_true",
+        help="Treat BUSY=0 as ready (some board revisions use inverted polarity)",
+    )
+    parser.add_argument(
+        "--no-busy-auto-fallback",
+        action="store_true",
+        help="Disable automatic BUSY polarity fallback after timeout",
+    )
 
     return parser.parse_args()
 
@@ -39,10 +59,19 @@ def main() -> None:
         rst=args.pin_rst, dc=args.pin_dc, cs=args.pin_cs, busy=args.pin_busy
     )
     spi = SpiConfig(
-        bus=args.spi_bus, device=args.spi_device, max_speed_hz=args.spi_speed, mode=0
+        bus=args.spi_bus,
+        device=args.spi_device,
+        max_speed_hz=args.spi_speed,
+        mode=0,
+        use_hardware_cs=not args.manual_cs,
     )
 
-    epd = GDEY0154F51.from_rpi(pin_config=pins, spi_config=spi)
+    epd = GDEY0154F51.from_rpi(
+        pin_config=pins,
+        spi_config=spi,
+        busy_ready_level=0 if args.busy_active_low else 1,
+        busy_auto_fallback=not args.no_busy_auto_fallback,
+    )
     try:
         epd.display_image(
             args.image,
@@ -50,6 +79,7 @@ def main() -> None:
             fit=args.fit,
             rotate=args.rotate,
             auto_sleep=not args.no_sleep,
+            fast_update=args.fast_update,
         )
         print("display refresh complete")
     finally:

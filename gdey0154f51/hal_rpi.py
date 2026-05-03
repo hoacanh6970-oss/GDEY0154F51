@@ -11,6 +11,7 @@ class RPiSpiBus:
     def __init__(self, config: SpiConfig) -> None:
         self._config = config
         self._spi = None
+        self.uses_hardware_cs = config.use_hardware_cs
 
     def open(self) -> None:
         if self._spi is not None:
@@ -21,6 +22,10 @@ class RPiSpiBus:
         spi.open(self._config.bus, self._config.device)
         spi.max_speed_hz = self._config.max_speed_hz
         spi.mode = self._config.mode
+        try:
+            spi.no_cs = not self._config.use_hardware_cs
+        except AttributeError:
+            pass
         self._spi = spi
 
     def write(self, data: bytes) -> None:

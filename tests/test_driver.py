@@ -32,21 +32,21 @@ class DriverTests(unittest.TestCase):
             [
                 0x4D,
                 0x00,
-                0x01,
-                0x03,
                 0x06,
                 0x50,
-                0x60,
                 0x61,
-                0xE7,
-                0xE3,
-                0xB4,
-                0xB5,
                 0xE9,
                 0x30,
                 0x04,
             ],
         )
+
+    def test_fast_init_sequence_appends_fast_commands(self) -> None:
+        self.gpio.set_input_value(self.pins.busy, 1)
+        self.controller.init_fast_update()
+
+        commands = [item.value for item in self.controller.trace if item.kind == "cmd"]
+        self.assertEqual(commands[-3:], [0xE0, 0xE6, 0xA5])
 
     def test_wait_busy_timeout(self) -> None:
         self.gpio.set_input_value(self.pins.busy, 0)
@@ -67,6 +67,26 @@ class DriverTests(unittest.TestCase):
         self.device.display_demo_buffer(demo, auto_sleep=False)
 
         self.assertEqual(self.controller.last_ram[0], 0x6C)
+
+    def test_hardware_cs_mode_does_not_allocate_cs_gpio(self) -> None:
+        self.assertNotIn(self.pins.cs, self.gpio.pin_mode)
+
+    def test_init_continues_when_busy_stays_low_after_reset(self) -> None:
+        reads = {"count": 0}
+
+        def dynamic_read(pin: int) -> int:
+            if pin != self.pins.busy:
+                return self.gpio.pin_values.get(pin, 1)
+            reads["count"] += 1
+            if reads["count"] < 300:
+                return 0
+            return 1
+
+        self.gpio.read = dynamic_read  # type: ignore[method-assign]
+        self.controller.init_full_update()
+
+        commands = [item.value for item in self.controller.trace if item.kind == "cmd"]
+        self.assertIn(0x04, commands)
 
 
 if __name__ == "__main__":

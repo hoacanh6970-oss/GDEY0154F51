@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 
-WIDTH = 152
-HEIGHT = 152
+WIDTH = 200
+HEIGHT = 200
 PIXELS_PER_BYTE = 4
 BUFFER_SIZE = WIDTH * HEIGHT // PIXELS_PER_BYTE
 
@@ -30,6 +30,7 @@ class SpiConfig:
     device: int = 0
     max_speed_hz: int = 2_000_000
     mode: int = 0
+    use_hardware_cs: bool = True
 
 
 FILL_BYTE_BY_COLOR: dict[Color, int] = {

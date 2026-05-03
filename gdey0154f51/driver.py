@@ -31,6 +31,10 @@ class GDEY0154F51Controller:
         spi: SpiBus,
         gpio: GpioBus,
         pins: PinConfig | None = None,
+        manual_cs: bool = False,
+        busy_ready_level: int = 1,
+        busy_auto_fallback: bool = False,
+        initial_busy_timeout_s: float = 0.25,
         busy_timeout_s: float = 20.0,
         busy_poll_interval_s: float = 0.01,
         sleep_fn=time.sleep,
@@ -38,6 +42,11 @@ class GDEY0154F51Controller:
         self.spi = spi
         self.gpio = gpio
         self.pins = pins or PinConfig()
+        self.manual_cs = manual_cs
+        self.busy_ready_level = 1 if busy_ready_level else 0
+        self.busy_auto_fallback = busy_auto_fallback
+        self._busy_fallback_used = False
+        self.initial_busy_timeout_s = initial_busy_timeout_s
         self.busy_timeout_s = busy_timeout_s
         self.busy_poll_interval_s = busy_poll_interval_s
         self.sleep_fn = sleep_fn
@@ -50,38 +59,61 @@ class GDEY0154F51Controller:
         self.gpio.setup_input(self.pins.busy)
         self.gpio.setup_output(self.pins.rst)
         self.gpio.setup_output(self.pins.dc)
-        self.gpio.setup_output(self.pins.cs)
-        self.gpio.write(self.pins.cs, 1)
+        if self.manual_cs:
+            self.gpio.setup_output(self.pins.cs)
+            self.gpio.write(self.pins.cs, 1)
         self.gpio.write(self.pins.rst, 1)
 
+    def _select_chip(self) -> None:
+        if self.manual_cs:
+            self.gpio.write(self.pins.cs, 0)
+
+    def _deselect_chip(self) -> None:
+        if self.manual_cs:
+            self.gpio.write(self.pins.cs, 1)
+
     def write_command(self, command: int) -> None:
-        self.gpio.write(self.pins.cs, 0)
+        self._select_chip()
         self.gpio.write(self.pins.dc, 0)
         self.spi.write(bytes([command & 0xFF]))
-        self.gpio.write(self.pins.cs, 1)
+        self._deselect_chip()
         self.trace.append(DriverTrace("cmd", command & 0xFF))
 
     def write_data_byte(self, value: int) -> None:
-        self.gpio.write(self.pins.cs, 0)
+        self._select_chip()
         self.gpio.write(self.pins.dc, 1)
         self.spi.write(bytes([value & 0xFF]))
-        self.gpio.write(self.pins.cs, 1)
+        self._deselect_chip()
         self.trace.append(DriverTrace("data", value & 0xFF))
 
     def write_data(self, data: bytes) -> None:
         for value in data:
             self.write_data_byte(value)
 
-    def wait_until_idle(self, timeout_s: float | None = None) -> None:
-        timeout = self.busy_timeout_s if timeout_s is None else timeout_s
-        deadline = time.monotonic() + timeout
+    def _wait_until_busy_level(self, ready_level: int, timeout_s: float) -> None:
+        deadline = time.monotonic() + timeout_s
 
-        while self.gpio.read(self.pins.busy) != 1:
+        while self.gpio.read(self.pins.busy) != ready_level:
             if time.monotonic() > deadline:
                 raise TimeoutError(
-                    f"BUSY pin did not become ready within {timeout:.2f}s"
+                    f"BUSY pin did not become ready within {timeout_s:.2f}s"
                 )
             self.sleep_fn(self.busy_poll_interval_s)
+
+    def wait_until_idle(self, timeout_s: float | None = None) -> None:
+        timeout = self.busy_timeout_s if timeout_s is None else timeout_s
+        try:
+            self._wait_until_busy_level(self.busy_ready_level, timeout)
+            return
+        except TimeoutError:
+            # Some board revisions expose inverse BUSY polarity.
+            if not self.busy_auto_fallback or self._busy_fallback_used:
+                raise
+
+        opposite_level = 1 - self.busy_ready_level
+        self._wait_until_busy_level(opposite_level, timeout)
+        self.busy_ready_level = opposite_level
+        self._busy_fallback_used = True
 
     def hardware_reset(self) -> None:
         self.sleep_fn(0.02)
@@ -90,9 +122,17 @@ class GDEY0154F51Controller:
         self.gpio.write(self.pins.rst, 1)
         self.sleep_fn(0.05)
 
+    def wait_until_idle_after_reset(self) -> None:
+        # Some boards keep BUSY asserted until the first init/power-on command
+        # after deep sleep. Treat this pre-init wait as a best-effort probe.
+        self.wait_until_idle(timeout_s=self.initial_busy_timeout_s)
+
     def init_full_update(self) -> None:
         self.hardware_reset()
-        self.wait_until_idle()
+        try:
+            self.wait_until_idle_after_reset()
+        except TimeoutError:
+            pass
 
         self.write_command(0x4D)
         self.write_data_byte(0x78)
@@ -100,35 +140,14 @@ class GDEY0154F51Controller:
         self.write_command(0x00)
         self.write_data(bytes([0x0F, 0x29]))
 
-        self.write_command(0x01)
-        self.write_data(bytes([0x07, 0x00]))
-
-        self.write_command(0x03)
-        self.write_data(bytes([0x10, 0x54, 0x44]))
-
         self.write_command(0x06)
-        self.write_data(bytes([0x05, 0x00, 0x3F, 0x0A, 0x25, 0x12, 0x1A]))
+        self.write_data(bytes([0x0D, 0x12, 0x30, 0x20, 0x19, 0x2A, 0x22]))
 
         self.write_command(0x50)
         self.write_data_byte(0x37)
 
-        self.write_command(0x60)
-        self.write_data(bytes([0x02, 0x02]))
-
         self.write_command(0x61)
-        self.write_data(bytes([0x00, 0x98, 0x00, 0x98]))
-
-        self.write_command(0xE7)
-        self.write_data_byte(0x1C)
-
-        self.write_command(0xE3)
-        self.write_data_byte(0x22)
-
-        self.write_command(0xB4)
-        self.write_data_byte(0xD0)
-
-        self.write_command(0xB5)
-        self.write_data_byte(0x03)
+        self.write_data(bytes([0x00, 0xC8, 0x00, 0xC8]))
 
         self.write_command(0xE9)
         self.write_data_byte(0x01)
@@ -137,6 +156,19 @@ class GDEY0154F51Controller:
         self.write_data_byte(0x08)
 
         self.write_command(0x04)
+        self.wait_until_idle()
+
+    def init_fast_update(self) -> None:
+        self.init_full_update()
+
+        self.write_command(0xE0)
+        self.write_data_byte(0x02)
+
+        self.write_command(0xE6)
+        self.write_data_byte(0x5D)
+
+        self.write_command(0xA5)
+        self.write_data_byte(0x00)
         self.wait_until_idle()
 
     def write_ram(self, buffer: bytes) -> None:
@@ -153,6 +185,7 @@ class GDEY0154F51Controller:
 
     def sleep(self) -> None:
         self.write_command(0x02)
+        self.write_data_byte(0x00)
         self.wait_until_idle()
         self.sleep_fn(0.1)
 
@@ -176,25 +209,38 @@ class GDEY0154F51:
         cls,
         pin_config: PinConfig | None = None,
         spi_config: SpiConfig | None = None,
+        busy_ready_level: int = 1,
+        busy_auto_fallback: bool = True,
         busy_timeout_s: float = 20.0,
     ) -> "GDEY0154F51":
-        hal = create_rpi_hal(pin_config=pin_config, spi_config=spi_config)
+        effective_spi_config = spi_config or SpiConfig()
+        hal = create_rpi_hal(pin_config=pin_config, spi_config=effective_spi_config)
         controller = GDEY0154F51Controller(
             spi=hal.spi,
             gpio=hal.gpio,
             pins=pin_config or PinConfig(),
+            manual_cs=not effective_spi_config.use_hardware_cs,
+            busy_ready_level=busy_ready_level,
+            busy_auto_fallback=busy_auto_fallback,
             busy_timeout_s=busy_timeout_s,
         )
         return cls(controller=controller)
 
-    def display_native_buffer(self, buffer: bytes, auto_sleep: bool = True) -> None:
-        self.controller.init_full_update()
+    def display_native_buffer(
+        self, buffer: bytes, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
+        if fast_update:
+            self.controller.init_fast_update()
+        else:
+            self.controller.init_full_update()
         self.controller.write_ram(buffer)
         self.controller.refresh()
         if auto_sleep:
             self.controller.sleep()
 
-    def display_demo_buffer(self, demo_buffer: bytes, auto_sleep: bool = True) -> None:
+    def display_demo_buffer(
+        self, demo_buffer: bytes, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
         if len(demo_buffer) != BUFFER_SIZE:
             raise ValueError(f"buffer size must be {BUFFER_SIZE} bytes")
 
@@ -206,7 +252,9 @@ class GDEY0154F51:
             p3 = DEMO_TO_NATIVE_2BIT[value & 0x03]
             native[i] = (p0 << 6) | (p1 << 4) | (p2 << 2) | p3
 
-        self.display_native_buffer(bytes(native), auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            bytes(native), auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
     def display_image(
         self,
@@ -215,18 +263,25 @@ class GDEY0154F51:
         fit: str = "contain",
         rotate: int = 0,
         auto_sleep: bool = True,
+        fast_update: bool = False,
     ) -> None:
         options = ConvertOptions(dither=dither, fit=fit, rotate=rotate)
         buffer = self.converter.convert_file(image_path, options=options)
-        self.display_native_buffer(buffer, auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            buffer, auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
-    def fill(self, color: Color, auto_sleep: bool = True) -> None:
+    def fill(
+        self, color: Color, auto_sleep: bool = True, fast_update: bool = False
+    ) -> None:
         fill_byte = FILL_BYTE_BY_COLOR[color]
         buffer = bytes([fill_byte]) * BUFFER_SIZE
-        self.display_native_buffer(buffer, auto_sleep=auto_sleep)
+        self.display_native_buffer(
+            buffer, auto_sleep=auto_sleep, fast_update=fast_update
+        )
 
-    def clear(self, auto_sleep: bool = True) -> None:
-        self.fill(Color.WHITE, auto_sleep=auto_sleep)
+    def clear(self, auto_sleep: bool = True, fast_update: bool = False) -> None:
+        self.fill(Color.WHITE, auto_sleep=auto_sleep, fast_update=fast_update)
 
     def close(self) -> None:
         try:
