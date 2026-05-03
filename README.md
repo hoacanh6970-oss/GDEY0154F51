@@ -1,6 +1,6 @@
 # GDEY0154F51 Raspberry Pi Driver
 
-基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（152x152, 4-color, 2bpp）。
+基于官方 Arduino 示例迁移的 Raspberry Pi Python 驱动，目标屏幕为 GDEY0154F51（200x200, 4-color, 2bpp）。
 
 ## 特性
 
@@ -64,6 +64,14 @@ sudo python tools/display_image.py --image assets/test.jpg
 sudo python tools/test_colors.py --interval 2 --repeat 1
 ```
 
+若出现 `BUSY pin did not become ready`，可尝试：
+
+```bash
+sudo python tools/test_colors.py --busy-active-low
+# 或显示图片时：
+sudo python tools/display_image.py --image assets/test.jpg --busy-active-low
+```
+
 ## 默认引脚
 
 默认使用 BCM 编号：
@@ -90,6 +98,30 @@ with GDEY0154F51.from_rpi() as epd:
 python -m unittest discover -s tests -v
 ```
 
+## Wi-Fi 远程控制（Pi Server + Mac Hub）
+
+安装新增依赖后，可分别启动：
+
+```bash
+# Pi 端（建议在树莓派执行）
+python -m gdey0154f51.pi_server.main
+
+# Mac 端 Hub
+python -m gdey0154f51.mac_hub.main
+```
+
+也可使用工具脚本：
+
+```bash
+python tools/run_pi_server.py
+python tools/run_mac_hub.py
+```
+
+接口摘要：
+
+- Pi Server：`/v1/health`, `/v1/capabilities`, `/v1/jobs/display`, `/v1/jobs/{job_id}`
+- Mac Hub：`/api/v1/display/image`, `/api/v1/display/text`, `/api/v1/display/todo`, `/api/v1/jobs/{job_id}`
+
 ## 重要说明
 
 - 该屏幕每次全刷建议走 `init -> display -> sleep`，本库默认遵循该流程。
@@ -102,3 +134,4 @@ python -m unittest discover -s tests -v
 - `docs/API_CN.md`
 - `docs/TOOLS_CN.md`
 - `docs/TESTING_CN.md`
+- `docs/REMOTE_CONTROL_CN.md`
