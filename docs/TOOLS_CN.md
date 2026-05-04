@@ -34,8 +34,21 @@ sudo python tools/display_image.py --image test.jpg
 可选参数：
 
 - `--spi-bus` `--spi-device` `--spi-speed`
+- `--spi-backend hardware|software`
+- `--soft-sck` `--soft-mosi`
+- `--soft-bit-delay-us` `--soft-cs-gap-us`
 - `--pin-rst` `--pin-dc` `--pin-cs` `--pin-busy`
 - `--no-sleep` 调试用，不建议常用
+
+软件 SPI 示例（稳定优先）：
+
+```bash
+sudo python tools/display_image.py \
+  --image test.jpg \
+  --spi-backend software \
+  --soft-bit-delay-us 1 \
+  --soft-cs-gap-us 10
+```
 
 ## 3. 四色链路测试
 

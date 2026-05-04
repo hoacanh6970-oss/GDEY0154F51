@@ -31,6 +31,11 @@ class SpiConfig:
     max_speed_hz: int = 2_000_000
     mode: int = 0
     use_hardware_cs: bool = True
+    backend: str = "hardware"
+    soft_sck_pin: int = 11
+    soft_mosi_pin: int = 10
+    soft_bit_delay_us: int = 1
+    soft_cs_gap_us: int = 10
 
 
 FILL_BYTE_BY_COLOR: dict[Color, int] = {

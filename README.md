@@ -5,6 +5,7 @@
 ## 特性
 
 - 使用 `spidev` 和 `RPi.GPIO`
+- 支持可切换的软件 SPI（GPIO 位带，稳定排障优先）
 - 面向对象驱动 API，适合二次开发
 - 提供图像转换工具（普通图片 -> 墨水屏 native buffer）
 - 提供无硬件单元测试和硬件示例脚本
@@ -72,6 +73,18 @@ sudo python tools/test_colors.py --busy-active-low
 sudo python tools/display_image.py --image assets/test.jpg --busy-active-low
 ```
 
+若怀疑硬件 SPI 时序不匹配，可切到软件 SPI（默认更慢、更稳）：
+
+```bash
+sudo python tools/display_image.py \
+  --image assets/test.jpg \
+  --spi-backend software \
+  --soft-bit-delay-us 1 \
+  --soft-cs-gap-us 10
+```
+
+软件 SPI 首版仅支持 `mode=0` 且仅用于写屏。
+
 ## 默认引脚
 
 默认使用 BCM 编号：
@@ -80,6 +93,11 @@ sudo python tools/display_image.py --image assets/test.jpg --busy-active-low
 - `DC=25`
 - `CS=8`
 - `BUSY=24`
+
+软件 SPI 默认引脚：
+
+- `SCK=11`
+- `MOSI=10`
 
 可在工具命令行参数中覆盖。
 

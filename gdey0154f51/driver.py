@@ -37,6 +37,7 @@ class GDEY0154F51Controller:
         initial_busy_timeout_s: float = 0.25,
         busy_timeout_s: float = 20.0,
         busy_poll_interval_s: float = 0.01,
+        cs_gap_s: float = 0.0,
         sleep_fn=time.sleep,
     ) -> None:
         self.spi = spi
@@ -49,6 +50,7 @@ class GDEY0154F51Controller:
         self.initial_busy_timeout_s = initial_busy_timeout_s
         self.busy_timeout_s = busy_timeout_s
         self.busy_poll_interval_s = busy_poll_interval_s
+        self.cs_gap_s = cs_gap_s
         self.sleep_fn = sleep_fn
         self.trace: list[DriverTrace] = []
         self.last_ram: bytes = b""
@@ -71,6 +73,8 @@ class GDEY0154F51Controller:
     def _deselect_chip(self) -> None:
         if self.manual_cs:
             self.gpio.write(self.pins.cs, 1)
+            if self.cs_gap_s > 0:
+                self.sleep_fn(self.cs_gap_s)
 
     def write_command(self, command: int) -> None:
         self._select_chip()
@@ -215,14 +219,22 @@ class GDEY0154F51:
     ) -> "GDEY0154F51":
         effective_spi_config = spi_config or SpiConfig()
         hal = create_rpi_hal(pin_config=pin_config, spi_config=effective_spi_config)
+        backend = effective_spi_config.backend.lower()
+        manual_cs = backend == "software" or not effective_spi_config.use_hardware_cs
+        cs_gap_s = (
+            effective_spi_config.soft_cs_gap_us / 1_000_000.0
+            if backend == "software"
+            else 0.0
+        )
         controller = GDEY0154F51Controller(
             spi=hal.spi,
             gpio=hal.gpio,
             pins=pin_config or PinConfig(),
-            manual_cs=not effective_spi_config.use_hardware_cs,
+            manual_cs=manual_cs,
             busy_ready_level=busy_ready_level,
             busy_auto_fallback=busy_auto_fallback,
             busy_timeout_s=busy_timeout_s,
+            cs_gap_s=cs_gap_s,
         )
         return cls(controller=controller)
 
