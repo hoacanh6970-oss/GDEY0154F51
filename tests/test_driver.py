@@ -55,6 +55,49 @@ class DriverTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):
             self.controller.wait_until_idle(timeout_s=0.01)
 
+    def test_manual_cs_bulk_write_uses_single_cs_window_for_multibyte_data(self) -> None:
+        spi = MockSpiBus()
+        gpio = MockGpioBus()
+        controller = GDEY0154F51Controller(
+            spi=spi,
+            gpio=gpio,
+            pins=self.pins,
+            manual_cs=True,
+            sleep_fn=lambda _: None,
+        )
+
+        writes_before = len(gpio.writes)
+        controller.write_data(b"\xAA\xBB\xCC")
+        writes_after = gpio.writes[writes_before:]
+
+        cs_events = [event for event in writes_after if event[0] == self.pins.cs]
+        self.assertEqual(cs_events, [(self.pins.cs, 0), (self.pins.cs, 1)])
+        self.assertEqual(spi.writes, [b"\xAA\xBB\xCC"])
+
+    def test_write_ram_uses_two_spi_writes_command_plus_full_buffer(self) -> None:
+        spi = MockSpiBus()
+        gpio = MockGpioBus()
+        controller = GDEY0154F51Controller(
+            spi=spi,
+            gpio=gpio,
+            pins=self.pins,
+            manual_cs=True,
+            sleep_fn=lambda _: None,
+        )
+
+        payload = bytes([0x55]) * BUFFER_SIZE
+        controller.write_ram(payload)
+
+        self.assertEqual(len(spi.writes), 2)
+        self.assertEqual(spi.writes[0], b"\x10")
+        self.assertEqual(len(spi.writes[1]), BUFFER_SIZE)
+        self.assertEqual(spi.writes[1], payload)
+
+    def test_bulk_write_keeps_trace_per_byte(self) -> None:
+        self.controller.write_data(b"\x01\x02\xFE")
+        data_trace = [item.value for item in self.controller.trace if item.kind == "data"]
+        self.assertEqual(data_trace, [0x01, 0x02, 0xFE])
+
     def test_fill_white_generates_expected_native_buffer(self) -> None:
         self.gpio.set_input_value(self.pins.busy, 1)
         self.device.fill(Color.WHITE, auto_sleep=False)

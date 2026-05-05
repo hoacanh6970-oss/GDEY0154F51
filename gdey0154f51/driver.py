@@ -80,15 +80,21 @@ class GDEY0154F51Controller:
         self.trace.append(DriverTrace("cmd", command & 0xFF))
 
     def write_data_byte(self, value: int) -> None:
-        self._select_chip()
-        self.gpio.write(self.pins.dc, 1)
-        self.spi.write(bytes([value & 0xFF]))
-        self._deselect_chip()
-        self.trace.append(DriverTrace("data", value & 0xFF))
+        self._write_data_payload(bytes([value & 0xFF]))
 
     def write_data(self, data: bytes) -> None:
-        for value in data:
-            self.write_data_byte(value)
+        payload = bytes(data)
+        self._write_data_payload(payload)
+
+    def _write_data_payload(self, payload: bytes) -> None:
+        if not payload:
+            return
+        self.gpio.write(self.pins.dc, 1)
+        self._select_chip()
+        self.spi.write(payload)
+        self._deselect_chip()
+        for value in payload:
+            self.trace.append(DriverTrace("data", value))
 
     def _wait_until_busy_level(self, ready_level: int, timeout_s: float) -> None:
         deadline = time.monotonic() + timeout_s
