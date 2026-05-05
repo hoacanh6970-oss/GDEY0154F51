@@ -29,16 +29,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spi-device", type=int, default=0)
     parser.add_argument("--spi-speed", type=int, default=2_000_000)
     parser.add_argument(
-        "--spi-backend",
-        default="hardware",
-        choices=["hardware", "software"],
-        help="SPI backend: spidev hardware or GPIO bit-banged software SPI",
-    )
-    parser.add_argument("--soft-sck", type=int, default=11)
-    parser.add_argument("--soft-mosi", type=int, default=10)
-    parser.add_argument("--soft-bit-delay-us", type=int, default=1)
-    parser.add_argument("--soft-cs-gap-us", type=int, default=10)
-    parser.add_argument(
         "--manual-cs",
         action="store_true",
         help="Use GPIO-managed CS instead of spidev hardware chip select",
@@ -74,11 +64,6 @@ def main() -> None:
         max_speed_hz=args.spi_speed,
         mode=0,
         use_hardware_cs=not args.manual_cs,
-        backend=args.spi_backend,
-        soft_sck_pin=args.soft_sck,
-        soft_mosi_pin=args.soft_mosi,
-        soft_bit_delay_us=args.soft_bit_delay_us,
-        soft_cs_gap_us=args.soft_cs_gap_us,
     )
 
     epd = GDEY0154F51.from_rpi(

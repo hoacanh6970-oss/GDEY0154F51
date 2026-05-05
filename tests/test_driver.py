@@ -73,19 +73,6 @@ class DriverTests(unittest.TestCase):
     def test_hardware_cs_mode_does_not_allocate_cs_gpio(self) -> None:
         self.assertNotIn(self.pins.cs, self.gpio.pin_mode)
 
-    def test_manual_cs_mode_applies_cs_gap_delay(self) -> None:
-        sleep_calls: list[float] = []
-        controller = GDEY0154F51Controller(
-            spi=self.spi,
-            gpio=self.gpio,
-            pins=self.pins,
-            manual_cs=True,
-            cs_gap_s=0.00001,
-            sleep_fn=sleep_calls.append,
-        )
-        controller.write_command(0x4D)
-        self.assertIn(0.00001, sleep_calls)
-
     def test_init_continues_when_busy_stays_low_after_reset(self) -> None:
         reads = {"count": 0}
 

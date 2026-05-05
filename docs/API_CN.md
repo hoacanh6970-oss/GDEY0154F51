@@ -37,16 +37,6 @@
 
 默认 SPI：`bus=0, device=0, max_speed_hz=2000000, mode=0`
 
-新增软件 SPI 相关字段：
-
-- `backend='hardware'|'software'`（默认 `hardware`）
-- `soft_sck_pin=11`
-- `soft_mosi_pin=10`
-- `soft_bit_delay_us=1`（稳定优先）
-- `soft_cs_gap_us=10`（稳定优先）
-
-说明：软件 SPI 首版仅保证 `mode=0` 写通道，目标是稳定排障，不追求吞吐。
-
 ## 示例：显示一张图
 
 ```python
