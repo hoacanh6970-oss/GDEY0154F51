@@ -33,6 +33,15 @@ class RPiSpiBus:
             raise RuntimeError("SPI bus is not opened")
         if not data:
             return
+        # On some Raspberry Pi kernels (e.g. Pi Zero), xfer2() raises
+        # OverflowError when payload exceeds the driver bufsiz (often 4096).
+        # Prefer large-payload APIs when available.
+        if hasattr(self._spi, "writebytes2"):
+            self._spi.writebytes2(data)
+            return
+        if hasattr(self._spi, "xfer3"):
+            self._spi.xfer3(list(data))
+            return
         self._spi.xfer2(list(data))
 
     def close(self) -> None:
